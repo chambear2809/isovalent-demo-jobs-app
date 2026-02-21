@@ -1,0 +1,41 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: coreapi
+spec:
+  endpointSelector:
+    matchLabels:
+      app: coreapi
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:app: resumes
+        - matchLabels:
+            k8s:app: recruiter
+        - matchLabels:
+            k8s:app: jobposting
+      toPorts:
+        - ports:
+            - port: "9080"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPIngressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:app: elasticsearch-master
+      toPorts:
+        - ports:
+            - port: "9200"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPEgressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+{{- include "jobs-app.otelAgentEgress" . | nindent 4 }}
+{{- end }}

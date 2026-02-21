@@ -1,0 +1,47 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: jobs-app
+spec:
+  kafka:
+    replicas: {{ .Values.kafka.replicas }}
+    resources:
+      {{- toYaml .Values.kafka.resources | nindent 6 }}
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+      - name: tls
+        port: 9093
+        type: internal
+        tls: true
+    config:
+      {{- toYaml .Values.kafka.config | nindent 6 }}
+    storage:
+      type: jbod
+      volumes:
+      - id: 0
+        type: persistent-claim
+        size: {{ .Values.kafka.storage.size }}
+        deleteClaim: false
+        class: {{ .Values.kafka.storage.class }}
+  zookeeper:
+    replicas: {{ .Values.kafka.zookeeper.replicas }}
+    resources:
+      {{- toYaml .Values.kafka.zookeeper.resources | nindent 6 }}
+    storage:
+      class: {{ .Values.kafka.zookeeper.storage.class }}
+      type: persistent-claim
+      size: {{ .Values.kafka.zookeeper.storage.size}}
+      deleteClaim: {{ .Values.kafka.zookeeper.storage.deleteClaim }}
+  entityOperator:
+    topicOperator:
+      resources:
+        {{- toYaml .Values.kafka.topicOperator.resources | nindent 8 }}
+    userOperator:
+      resources:
+        {{- toYaml .Values.kafka.userOperator.resources | nindent 8 }}
+    tlsSidecar:
+      resources:
+        {{- toYaml .Values.kafka.userOperator.resources | nindent 8 }}

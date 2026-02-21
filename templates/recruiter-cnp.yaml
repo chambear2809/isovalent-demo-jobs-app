@@ -1,0 +1,27 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: recruiter
+spec:
+  endpointSelector:
+    matchLabels:
+      app: recruiter
+  ingress:
+    # TODO: ingress-nginx/cilium ingress
+    - {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:app: coreapi
+      toPorts:
+        - ports:
+            - port: "9080"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPEgressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+{{- include "jobs-app.otelAgentEgress" . | nindent 4 }}
+{{- end }}

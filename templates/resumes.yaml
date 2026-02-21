@@ -1,0 +1,74 @@
+# resume deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: resumes
+spec:
+  replicas: {{ .Values.resumes.replicas }}
+  selector:
+    matchLabels:
+      app: resumes
+  template:
+    metadata:
+      labels:
+        app: resumes
+      annotations:
+        {{- if .Values.instrumentation.nodejs.enabled }}
+        instrumentation.opentelemetry.io/inject-nodejs: {{ .Values.instrumentation.nodejs.name | quote }}
+        {{- else }}
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        {{- end }}
+    spec:
+      initContainers:
+        - name: wait-for-coreapi
+          image: curlimages/curl:latest
+          command: ['sh', '-c', 'until curl -s -o /dev/null http://coreapi:9080; do echo waiting for coreapi; sleep 5; done']
+        - name: wait-for-kafka
+          image: busybox
+          command: ['sh', '-c', 'until nc -zv jobs-app-kafka-brokers.{{ .Release.Namespace }}.svc.cluster.local 9092; do echo waiting for kafka; sleep 10; done']
+        - name: wait-for-topic
+          image: {{ .Values.resumes.waitForTopicImage | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka topic 'resumes'..."
+              MAX_RETRIES={{ .Values.resumes.waitForTopicMaxRetries }}
+              RETRY_COUNT=0
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server jobs-app-kafka-brokers.{{ .Release.Namespace }}.svc.cluster.local:9092 --describe --topic resumes 2>/dev/null; do
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+                  WAIT_TIME=$((MAX_RETRIES * 5))
+                  echo "WARNING: Topic 'resumes' not found after $MAX_RETRIES attempts ($WAIT_TIME seconds)";
+                  echo "Starting anyway - topic may be created later by Strimzi operator";
+                  exit 0;
+                fi
+                echo "Topic not found, retrying ($RETRY_COUNT/$MAX_RETRIES)...";
+                sleep 5;
+              done
+              echo "Kafka topic 'resumes' exists!"
+      containers:
+        - name: resumes
+          image: {{ include "jobs-app.image" .Values.resumes.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: API_ENDPOINT
+              value: "http://coreapi:9080/"
+            - name: KAFKA_HOST
+              value: jobs-app-kafka-brokers.{{ .Release.Namespace }}.svc.cluster.local:9092
+            - name: DEBUG
+              value: "{{ .Values.debug}}"
+            - name: ENABLE_TRACING
+              value: "{{ .Values.tracing.enabled }}"
+            - name: LOG_SPANS
+              value: "{{ .Values.tracing.logSpans }}"
+            - name: OTL_EXPORTER_ENABLED
+              value: "{{ .Values.tracing.otlpExporterEnabled }}"
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.tracing.otlpExporterHTTPEndpoint }}"
+          resources:
+            {{- toYaml .Values.resumes.resources | nindent 14 }}

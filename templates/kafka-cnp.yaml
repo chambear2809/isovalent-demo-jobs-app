@@ -1,0 +1,42 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: kafka
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: kafka
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:app: resumes
+        - matchLabels:
+            k8s:app: loader
+      toPorts:
+        - ports:
+            - port: "9092"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableKafkaIngressVisibility }}
+          rules:
+            kafka:
+              - {}
+          {{- end }}
+    - fromEndpoints:
+        - matchLabels:
+            k8s:name: strimzi-cluster-operator
+        - matchLabels:
+            k8s:app.kubernetes.io/name: entity-operator
+      toPorts:
+        - ports:
+            - port: "9091"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:app.kubernetes.io/name: zookeeper
+      toPorts:
+        - ports:
+            - port: "2181"
+              protocol: TCP
+{{- end }}

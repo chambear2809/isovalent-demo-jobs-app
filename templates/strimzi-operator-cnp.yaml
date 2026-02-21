@@ -1,0 +1,29 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: strimzi-cluster-operator
+spec:
+  endpointSelector:
+    matchLabels:
+      name: strimzi-cluster-operator
+  ingress:
+    - {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+    - toEndpoints:
+        - matchLabels:
+            k8s:app.kubernetes.io/name: zookeeper
+      toPorts:
+        - ports:
+            - port: "2181"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:app.kubernetes.io/name: kafka
+      toPorts:
+        - ports:
+            - port: "9091"
+              protocol: TCP
+{{- end }}

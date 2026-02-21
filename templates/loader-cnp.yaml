@@ -1,0 +1,37 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: loader
+spec:
+  endpointSelector:
+    matchLabels:
+      app: loader
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:app: crawler
+      toPorts:
+        - ports:
+            - port: "50051"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPIngressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:app.kubernetes.io/name: kafka
+      toPorts:
+        - ports:
+            - port: "9092"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableKafkaEgressVisibility }}
+          rules:
+            kafka:
+              - {}
+          {{- end }}
+{{- include "jobs-app.otelAgentEgress" . | nindent 4 }}
+{{- end }}

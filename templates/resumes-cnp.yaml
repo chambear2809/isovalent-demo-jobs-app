@@ -1,0 +1,34 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: resumes
+spec:
+  endpointSelector:
+    matchLabels:
+      app: resumes
+  ingress:
+    - {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:app.kubernetes.io/name: kafka
+      toPorts:
+        - ports:
+            - port: "9092"
+              protocol: TCP
+          # L7 Kafka inspection disabled for resumes to allow init container admin calls
+    - toEndpoints:
+        - matchLabels:
+            k8s:app: coreapi
+      toPorts:
+        - ports:
+            - port: "9080"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPEgressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+{{- include "jobs-app.otelAgentEgress" . | nindent 4 }}
+{{- end }}

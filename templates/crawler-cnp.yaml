@@ -1,0 +1,34 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: crawler
+spec:
+  endpointSelector:
+    matchLabels:
+      app: crawler
+  ingress:
+    - {}
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:app: loader
+      toPorts:
+        - ports:
+            - port: "50051"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPEgressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+{{- include "jobs-app.otelAgentEgress" . | nindent 4 }}
+{{- end }}

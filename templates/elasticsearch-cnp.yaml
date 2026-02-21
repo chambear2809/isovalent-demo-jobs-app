@@ -1,0 +1,34 @@
+{{ if .Values.networkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: elasticsearch
+spec:
+  endpointSelector:
+    matchLabels:
+      app: elasticsearch-master
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:app: coreapi
+        - matchLabels:
+            k8s:app: jobposting
+      toPorts:
+        - ports:
+            - port: "9200"
+              protocol: TCP
+          {{- if .Values.networkPolicy.enableHTTPIngressVisibility }}
+          rules:
+            http:
+              - {}
+          {{- end }}
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+{{- end }}

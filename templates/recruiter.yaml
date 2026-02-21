@@ -1,0 +1,96 @@
+# Recruiter service
+apiVersion: v1
+kind: Service
+metadata:
+  name: recruiter
+  labels:
+    app: recruiter
+spec:
+  ports:
+    - port: 9080
+      name: http
+  selector:
+    app: recruiter
+---
+# Recruiter deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recruiter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recruiter
+  template:
+    metadata:
+      labels:
+        app: recruiter
+      annotations:
+        {{- if .Values.instrumentation.nodejs.enabled }}
+        instrumentation.opentelemetry.io/inject-nodejs: {{ .Values.instrumentation.nodejs.name | quote }}
+        {{- else }}
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        {{- end }}
+    spec:
+      initContainers:
+        - name: wait-for-coreapi
+          image: curlimages/curl:latest
+          command: ['sh', '-c', 'until curl -s -o /dev/null http://coreapi:9080; do echo waiting for coreapi; sleep 5; done']
+      containers:
+        - name: recruiter
+          image: {{ include "jobs-app.image" .Values.recruiter.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9080
+          env:
+            - name: API_ENDPOINT
+              value: "http://coreapi:9080/"
+            - name: PORT
+              value: "9080"
+            - name: PERIODIC_REQUESTS
+              value: "10"
+            - name: DEBUG
+              value: "{{ .Values.debug}}"
+            - name: ENABLE_TRACING
+              value: "{{ .Values.tracing.enabled }}"
+            - name: LOG_SPANS
+              value: "{{ .Values.tracing.logSpans }}"
+            - name: OTL_EXPORTER_ENABLED
+              value: "{{ .Values.tracing.otlpExporterEnabled }}"
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.tracing.otlpExporterHTTPEndpoint }}"
+          resources:
+            {{- toYaml .Values.recruiter.resources | nindent 14 }}
+---
+{{- if .Values.recruiter.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: recruiter
+  annotations:
+{{- .Values.recruiter.ingress.annotations | toYaml | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.recruiter.ingress.className }}
+  rules:
+  - host: {{ .Values.recruiter.ingress.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: recruiter
+            port:
+              number: 9080
+        path: /
+        pathType: {{ .Values.recruiter.ingress.pathType }}
+{{ if .Values.recruiter.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.recruiter.ingress.host }}
+    secretName: {{ .Values.recruiter.ingress.tls.secretName }}
+{{- end}}
+{{- end}}
