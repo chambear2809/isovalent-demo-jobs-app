@@ -151,4 +151,4 @@ helm uninstall jobs-app -n tenant-jobs
 - Two helper scripts exist:
   - `error-isovalent.sh`
   - `no-error-isovalent.sh`
-- They currently reference an absolute chart path (`/Users/alecchamberlain/jobs-app`). Update that path if you want to use them from this repo location.
+- Run them from the repo root directory (the scripts use `.` as the chart path).
