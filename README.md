@@ -1,5 +1,5 @@
 # jobs-app Helm chart
-This repository contains the `jobs-app` Helm chart (`Chart.yaml` version `0.12.1`) used to deploy a demo job platform and supporting infrastructure on Kubernetes.
+This repository contains the `jobs-app` Helm chart (`Chart.yaml` version `0.12.4`) used to deploy a demo job platform and supporting infrastructure on Kubernetes.
 
 ## What the app does
 `jobs-app` simulates a multi-service hiring platform and background traffic for Kubernetes demos.
@@ -117,6 +117,14 @@ All defaults are in `values.yaml`.
   - `tracing.otlpExporterEnabled`
   - `tracing.otlpExporterHTTPEndpoint`
   - `tracing.otlpExporterGRPCEndpoint`
+  - default OTLP endpoints use `$(HOST_IP)` so workloads talk to the node-local Splunk OTel agent instead of the agent Service DNS name
+- Instrumentation:
+  - `instrumentation.nodejs.*`
+  - `instrumentation.python.*`
+  - Node.js auto-instrumentation is enabled by default and points at `otel-splunk/splunk-otel-collector`
+  - Python auto-instrumentation stays disabled by default because `coreapi` is not compatible with the current Python auto-instrumentation image set
+  - `coreapi` exports traces over OTLP HTTP to the node-local agent
+  - the chart patches the upstream `coreapi` tracing module at startup because the published image hardcodes the OTLP gRPC exporter and that path was not stable in this demo cluster
 - Network policy:
   - `networkPolicy.enabled`
   - `networkPolicy.enable*` toggles for DNS/HTTP/Kafka/Otel behavior
@@ -152,3 +160,4 @@ helm uninstall jobs-app -n tenant-jobs
   - `error-isovalent.sh`
   - `no-error-isovalent.sh`
 - Run them from the repo root directory (the scripts use `.` as the chart path).
+- The chart stays on the `0.12.x` line in this repo because upstream `0.13.x` requires newer Strimzi CRDs than the current demo cluster accepts.

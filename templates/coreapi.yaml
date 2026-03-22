@@ -34,7 +34,23 @@ spec:
         instrumentation.opentelemetry.io/inject-python: "false"
         {{- end }}
     spec:
+      volumes:
+        - name: coreapi-app
+          emptyDir: {}
       initContainers:
+        - name: patch-tracing-exporter
+          image: {{ include "jobs-app.image" .Values.coreapi.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -eu
+              cp -a /opt/app/. /patched-app/
+              sed -i 's|from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter|from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter|' /patched-app/tracing.py
+          volumeMounts:
+            - name: coreapi-app
+              mountPath: /patched-app
         - name: wait-for-elasticsearch
           image: curlimages/curl:latest
           command: ['sh', '-c', 'until curl -s -o /dev/null http://elasticsearch-master.{{ .Release.Namespace }}.svc.cluster.local:9200; do echo waiting for elasticsearch; sleep 5; done']
@@ -62,7 +78,7 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "{{ .Values.tracing.otlpExporterGRPCEndpoint }}"
+              value: "{{ .Values.tracing.otlpExporterHTTPEndpoint }}"
             - name: ERROR_RATE
               value: "{{ .Values.coreapi.errorRate }}"
             - name: SLEEP_RATE
@@ -71,6 +87,9 @@ spec:
               value: "{{ .Values.coreapi.sleepLowerBound }}"
             - name: SLOW_REQUEST_DURATION_UPPER_BOUND
               value: "{{ .Values.coreapi.sleepUpperBound }}"
+          volumeMounts:
+            - name: coreapi-app
+              mountPath: /opt/app
           resources:
             {{- toYaml .Values.coreapi.resources | nindent 14 }}
 

@@ -71,6 +71,9 @@ elasticsearch:
         storage: 10Gi
   secret:
     password: changeme
+  podAnnotations:
+    instrumentation.opentelemetry.io/container-names: elasticsearch
+    instrumentation.opentelemetry.io/inject-java: otel-splunk/splunk-otel-collector
   lifecycle:
     postStart:
       exec:
@@ -106,17 +109,17 @@ debug: false
 tracing:
   enabled: true
   otlpExporterEnabled: true
-  otlpExporterHTTPEndpoint: http://splunk-otel-collector-agent.otel-splunk.svc.cluster.local:4318
-  otlpExporterGRPCEndpoint: http://splunk-otel-collector-agent.otel-splunk.svc.cluster.local:4317
+  otlpExporterHTTPEndpoint: http://$(HOST_IP):4318
+  otlpExporterGRPCEndpoint: http://$(HOST_IP):4317
   logSpans: false
 
 instrumentation:
   nodejs:
-    enabled: false
-    name: splunk-otel-collector
+    enabled: true
+    name: otel-splunk/splunk-otel-collector
   python:
     enabled: false
-    name: splunk-otel-collector
+    name: otel-splunk/splunk-otel-collector
 
 recruiter:
   image:
